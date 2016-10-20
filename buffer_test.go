@@ -109,6 +109,7 @@ func BenchmarkChannel1024(b *testing.B) {
 		<-pipe
 	}
 	b.StopTimer()
+	close(pipe)
 }
 
 func BenchmarkBytePipe1024(b *testing.B) {
@@ -118,11 +119,14 @@ func BenchmarkBytePipe1024(b *testing.B) {
 	b.ResetTimer()
 	go func(n int) {
 		for i := 0; i < b.N; i++ {
-			pipe.Write(inbuf)
+			if pipe.Write(inbuf) == 0 {
+				break
+			}
 		}
 	}(b.N)
 	for i := 0; i < b.N; i++ {
 		pipe.Read(buf)
 	}
 	b.StopTimer()
+	pipe.Close()
 }

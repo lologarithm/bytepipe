@@ -66,7 +66,7 @@ func (bp *BytePipe) Write(b []byte) int {
 		return len(b)
 	}
 	if (w == bp.cap && r == 0) || w == r-1 {
-		// no space eft until reader reads something
+		// no space left until reader reads something
 		bp.wc.L.Lock()
 		if r == atomic.LoadUint32(&bp.r) {
 			bp.wc.Wait()
