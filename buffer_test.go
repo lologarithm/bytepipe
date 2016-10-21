@@ -1,51 +1,96 @@
 package bytepipe
 
 import (
+	"fmt"
 	"log"
 	"testing"
+	"time"
 )
 
 func TestBytePipe(t *testing.T) {
 	pipe := NewBytePipe(20)
 	go func() {
-		pipe.Write(make([]byte, 5))
-		pipe.Write(make([]byte, 6))
-		pipe.Write(make([]byte, 7))
-		pipe.Write(make([]byte, 8))
+		wtot := 0
+		wtot += pipe.Write([]byte{1, 2, 3, 4, 5})
+		wtot += pipe.Write([]byte{6, 7, 8, 9, 10, 11})
+		wtot += pipe.Write([]byte{12, 13, 14, 15, 16, 17, 18})
+		wtot += pipe.Write([]byte{19, 20, 21, 22, 23, 24, 25, 26})
+		log.Printf("TestBytePipe Wrote: %d bytes\n", wtot)
+		if wtot != 26 {
+			t.FailNow()
+		}
 	}()
-
-	buf := make([]byte, 10)
+	time.Sleep(time.Second)
+	buf := make([]byte, 15)
 	n := pipe.Read(buf)
+	counter := 0
+	fmt.Printf("Read %d bytes\n", n)
+	for i := 0; i < n; i++ {
+		if int(buf[i]) != (i + counter + 1) {
+			log.Printf("Byte %d value %d value was incorrect, expected: %d", i+counter, buf[i], i+counter+1)
+		}
+	}
+	counter = n
 	n2 := pipe.Read(buf)
-	if n+n2 == 15 {
+	fmt.Printf("Read %d bytes\n", n2)
+	for i := 0; i < n2; i++ {
+		if int(buf[i]) != (i + counter + 1) {
+			log.Printf("Byte %d value %d value was incorrect, expected: %d", i+counter, buf[i], i+counter+1)
+		}
+	}
+	counter += n2
+	if n+n2 == 26 {
 		// This means that we read all bytes in two reads.
 		return
 	}
 	n = pipe.Read(buf)
-	// This means some writes were still occuring when we
+	// This means some writes were still occuring when we were reading
 	if n == 0 {
 		//
 		t.FailNow()
 	}
+	for i := 0; i < n; i++ {
+		if int(buf[i]) != (i + counter + 1) {
+			log.Printf("Byte %d value %d value was incorrect, expected: %d", i+counter, buf[i], i+counter+1)
+		}
+	}
 }
 
 func TestBytePipeLargeMessage(t *testing.T) {
+	// Write more bytes to buffer than fit
+	// Try reading while write is still occuring
 	numBytes := 50
-	var pipeCap uint32 = 10
-	buffer := 20
+	var pipeCap uint32 = 20
+	buffer := 10
 
 	pipe := NewBytePipe(pipeCap)
 	go func(nb int) {
 		// Write in them bytes!
-		pipe.Write(make([]byte, nb))
+		a := make([]byte, nb)
+		for i := 0; i < nb; i++ {
+			a[i] = byte(i + 1)
+		}
+		wrote := pipe.Write(a)
+		log.Printf("TestBytePipeLarge Wrote num bytes: %d\n", wrote)
+		if wrote != nb {
+			t.FailNow()
+		}
 	}(numBytes)
 
+	time.Sleep(time.Second)
 	buf := make([]byte, buffer)
 	total := 0
 	for total < numBytes {
-		total += pipe.Read(buf)
+		n := pipe.Read(buf)
+		total += n
+		log.Printf("Read %d bytes, total: %d\n", n, total)
 	}
+
 	log.Printf("Read %d bytes using a %d buffer", total, buffer)
+	if pipe.Len() != 0 {
+		log.Printf("Bytes left after reading everything: %d", pipe.Len())
+		t.FailNow()
+	}
 }
 
 // func TestOutput(t *testing.T) {
@@ -117,12 +162,16 @@ func BenchmarkBytePipe1024(b *testing.B) {
 	inbuf := make([]byte, 1024)
 	b.ResetTimer()
 	go func(n int) {
-		for i := 0; i < b.N; i++ {
-			pipe.Write(inbuf)
+		for i := 0; i < n; i++ {
+			if pipe.Write(inbuf) == 0 {
+				break
+			}
 		}
 	}(b.N)
 	for i := 0; i < b.N; i++ {
-		pipe.Read(buf)
+		if pipe.Read(buf) == 0 {
+			break
+		}
 	}
 	b.StopTimer()
 }
