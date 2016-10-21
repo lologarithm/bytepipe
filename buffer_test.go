@@ -94,6 +94,23 @@ func TestBytePipeLargeMessage(t *testing.T) {
 // 	fmt.Printf("Channel mb/sec: %.2f\n", float64(total/10)/1024.0/1024.0)
 // }
 
+func BenchmarkChannel128(b *testing.B) {
+	pipe := make(chan []byte, 128)
+	buf := make([]byte, 128)
+	b.ResetTimer()
+	go func(n int) {
+		for i := 0; i < n; i++ {
+			inbuf := make([]byte, len(buf))
+			copy(inbuf, buf)
+			pipe <- inbuf
+		}
+	}(b.N)
+	for i := 0; i < b.N; i++ {
+		<-pipe
+	}
+	b.StopTimer()
+}
+
 func BenchmarkChannel1024(b *testing.B) {
 	pipe := make(chan []byte, 1024)
 	buf := make([]byte, 1024)
@@ -111,6 +128,43 @@ func BenchmarkChannel1024(b *testing.B) {
 	b.StopTimer()
 }
 
+func BenchmarkChannel2048(b *testing.B) {
+	pipe := make(chan []byte, 2048)
+	buf := make([]byte, 2048)
+	b.ResetTimer()
+	go func(n int) {
+		for i := 0; i < n; i++ {
+			inbuf := make([]byte, len(buf))
+			copy(inbuf, buf)
+			pipe <- inbuf
+		}
+	}(b.N)
+	for i := 0; i < b.N; i++ {
+		<-pipe
+	}
+	b.StopTimer()
+}
+
+func BenchmarkBytePipe128(b *testing.B) {
+	pipe := NewBytePipe(0)
+	buf := make([]byte, 128)
+	inbuf := make([]byte, 128)
+	b.ResetTimer()
+	go func(n int) {
+		for i := 0; i < n; i++ {
+			if pipe.Write(inbuf) == 0 {
+				break
+			}
+		}
+	}(b.N)
+	for i := 0; i < b.N; i++ {
+		if pipe.Read(buf) == 0 {
+			break
+		}
+	}
+	b.StopTimer()
+}
+
 func BenchmarkBytePipe1024(b *testing.B) {
 	pipe := NewBytePipe(0)
 	buf := make([]byte, 1024)
@@ -123,6 +177,26 @@ func BenchmarkBytePipe1024(b *testing.B) {
 	}(b.N)
 	for i := 0; i < b.N; i++ {
 		pipe.Read(buf)
+	}
+	b.StopTimer()
+}
+
+func BenchmarkBytePipe2048(b *testing.B) {
+	pipe := NewBytePipe(0)
+	buf := make([]byte, 2048)
+	inbuf := make([]byte, 2048)
+	b.ResetTimer()
+	go func(n int) {
+		for i := 0; i < n; i++ {
+			if pipe.Write(inbuf) == 0 {
+				break
+			}
+		}
+	}(b.N)
+	for i := 0; i < b.N; i++ {
+		if pipe.Read(buf) == 0 {
+			break
+		}
 	}
 	b.StopTimer()
 }
